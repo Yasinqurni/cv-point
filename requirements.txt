@@ -1,0 +1,23 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+SQLAlchemy==2.0.34
+python-dotenv==1.0.1
+pymysql==1.1.1
+python-dateutil==2.9.0
+pydantic-settings==2.4.0
+
+
+# RabbitMQ (async)
+aio-pika==9.4.1
+
+# LLM (Gemini)
+google-generativeai==0.7.2
+
+# RAG dependencies
+faiss-cpu==1.12.0
+sentence-transformers==3.0.1
+numpy==1.26.4
+
+# Cloudinary (upload documents)
+cloudinary==1.41.0
