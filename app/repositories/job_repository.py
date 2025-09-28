@@ -32,7 +32,7 @@ class JobRepositoryImpl(JobRepository):
         return job
 
     def get_list(self) -> list[Job]:
-        return self.db.query(Job).all()
+        return self.db.query(Job).filter(Job.title != "").all()
 
 
 def get_job_repository(

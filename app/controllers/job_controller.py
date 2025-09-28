@@ -8,7 +8,10 @@ from app.pkg.interceptor.response import success_response, error_response
 class JobController(ABC):
     @abstractmethod
     async def upload_job(self, file: UploadFile):
-        pass
+        ...
+
+    async def get_list(self):
+        ...
 
 
 class JobControllerImpl(JobController):
@@ -22,7 +25,13 @@ class JobControllerImpl(JobController):
         except ValueError as ve:
             return error_response(message=str(ve), status_code=400)
 
-
+    async def get_list(self):
+        try:
+            result = await self.service.get_list()
+            return success_response(result)
+        except ValueError as ve:
+            return error_response(message=str(ve), status_code=400)
+        
 
 def get_job_controller(
     service: JobServiceImpl = Depends(get_job_service),
