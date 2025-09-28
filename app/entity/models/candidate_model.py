@@ -6,8 +6,8 @@ from sqlalchemy.orm import relationship, declarative_base
 
 db = declarative_base()
 
-class Upload(db):
-    __tablename__ = "uploads"
+class Candidate(db):
+    __tablename__ = "candidates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     candidate_name = Column(String(255), nullable=True)

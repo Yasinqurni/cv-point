@@ -7,11 +7,13 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore", 
     )
 
     # app config
     app_name: str = Field("cv-point", env="APP_NAME")
+    app_version: str = Field("0.1", env="APP_VERSION")
     env: str = Field("development", env="ENVIRONMENT")
     debug: bool = Field(True, env="DEBUG_MODE")
     port: int = Field(8000, env="APP_PORT")

@@ -2,7 +2,7 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from config import get_config, Config
+from .config import get_config, Config
 
 
 def build_dsn(cfg: Config) -> str:

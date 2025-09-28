@@ -12,11 +12,8 @@ class Job(db):
     __tablename__ = "jobs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    upload_id = Column(Integer, ForeignKey("uploads.id", ondelete="CASCADE"), nullable=False)
-    status = Column(Enum("queued", "processing", "completed", "failed", name="job_status"), nullable=False)
+    title = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    requirements = Column(Text, nullable=True)  # rubric detail
     created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
-
-    # relationships
-    upload = relationship("Upload", back_populates="jobs")
-    result = relationship("Result", back_populates="job", uselist=False, cascade="all, delete-orphan")
