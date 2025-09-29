@@ -1,14 +1,5 @@
 -- migrate:up
 
--- Table: candidates
-CREATE TABLE candidates (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    candidate_name VARCHAR(255),
-    cv_file_path VARCHAR(500) NOT NULL,
-    report_file_path VARCHAR(500) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Table: jobs
 CREATE TABLE jobs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -19,12 +10,25 @@ CREATE TABLE jobs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table: candidates
+CREATE TABLE candidates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    candidate_name VARCHAR(255),
+    job_id INT,
+    cv_file_path VARCHAR(500) NOT NULL,
+    report_file_path VARCHAR(500) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     CONSTRAINT fk_candidates_job
+        FOREIGN KEY (job_id) REFERENCES jobs(id)
+);
+
 -- Table: queues
 CREATE TABLE queues (
     id INT AUTO_INCREMENT PRIMARY KEY,
     upload_id INT NOT NULL,
     source ENUM('jobs','candidates') NOT NULL,
-    status ENUM('queued','processing','completed','failed') NOT NULL,
+    status ENUM('queued','completed','failed') NOT NULL,
+    reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -52,5 +56,5 @@ CREATE INDEX idx_results_queue_id ON results(queue_id);
 -- migrate:down
 DROP TABLE IF EXISTS results;
 DROP TABLE IF EXISTS queues;
-DROP TABLE IF EXISTS jobs;
 DROP TABLE IF EXISTS candidates;
+DROP TABLE IF EXISTS jobs;

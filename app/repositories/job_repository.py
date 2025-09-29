@@ -19,6 +19,10 @@ class JobRepository(ABC):
     @abstractmethod
     def update_trx(self, id=int, title: str = "", description: str = "", requirements: str = "") -> Job:
         ...
+
+    @abstractmethod
+    def get_by_id(self, id: int) -> Optional[Job]:
+        ...
     
 class JobRepositoryImpl(JobRepository):
     def __init__(self, db: Session):
@@ -46,6 +50,9 @@ class JobRepositoryImpl(JobRepository):
             job.requirements = requirements
             self.db.flush()
         return job
+    
+    def get_by_id(self, id: int) -> Job | None:
+        return self.db.query(Job).filter(Job.id == id).first()
 
 
 def get_job_repository(

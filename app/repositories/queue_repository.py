@@ -10,9 +10,13 @@ class QueueRepository(ABC):
     @abstractmethod
     def create_trx(self, upload_id: int, source: str, status: str = QueueStatus.QUEUED.value) -> Queue:
         ...
-    
+
     @abstractmethod
-    def update_status_trx(self, queue_id: int, status: str) -> Optional[Queue]:
+    def create(self, upload_id: int, source: str, status: str = QueueStatus.QUEUED.value) -> Queue:
+        ...
+
+    @abstractmethod
+    def update_status_trx(self, queue_id: int, status: str, reason: str) -> Optional[Queue]:
         ...
     
     @abstractmethod
@@ -22,7 +26,14 @@ class QueueRepository(ABC):
     @abstractmethod
     def list_by_upload(self, upload_id: int) -> List[Queue]:
         ...
+    
+    @abstractmethod
+    def get_by_source_and_upload_id(self, source: str, upload_id: int) -> Optional[Queue]:
+        ...
 
+    @abstractmethod
+    def update_status(self, queue_id: int, status: str) -> Optional[Queue]:
+        ...
 
 class QueueRepositoryImpl(QueueRepository):
     def __init__(self, db: Session):
@@ -33,11 +44,19 @@ class QueueRepositoryImpl(QueueRepository):
         self.db.add(queue)
         self.db.flush()
         return queue
+    
+    def create(self, upload_id: int, source: str, status: str = QueueStatus.QUEUED.value) -> Queue:
+        queue = Queue(upload_id=upload_id, source=source, status=status)
+        self.db.add(queue)
+        self.db.commit()
+        self.db.refresh(queue)
+        return queue
 
-    def update_status_trx(self, queue_id: int, status: str) -> Queue | None:
+    def update_status_trx(self, queue_id: int, status: str, reason: str) -> Queue | None:
         queue = self.db.query(Queue).filter(Queue.id == queue_id).first()
         if queue:
             queue.status = status
+            queue.reason = reason
             self.db.flush()
         return queue
 
@@ -46,6 +65,17 @@ class QueueRepositoryImpl(QueueRepository):
 
     def list_by_upload(self, upload_id: int) -> list[Queue]:
         return self.db.query(Queue).filter(Queue.upload_id == upload_id).all()
+    
+    def get_by_source_and_upload_id(self, source: str, upload_id: int) -> Optional[Queue]:
+        return self.db.query(Queue).filter(Queue.source == source, Queue.upload_id == upload_id).first()
+    
+    def update_status(self, queue_id: int, status: str) -> Queue | None:
+        queue = self.db.query(Queue).filter(Queue.id == queue_id).first()
+        if queue:
+            queue.status = status
+            self.db.commit()
+            self.db.refresh(queue)
+        return queue
 
 
 def get_queue_repository(
