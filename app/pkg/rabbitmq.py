@@ -77,6 +77,7 @@ async def consume_queue(queue_name: QueueName, callback):
     queue = await channel.get_queue(queue_name.value, ensure=True)
 
     async with queue.iterator() as queue_iter:
+        print(f"Consuming messages from {queue_name.value} data: {queue_iter}")
         async for message in queue_iter:
             async with message.process():
                 await callback(message)

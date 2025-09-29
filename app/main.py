@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+import asyncio
+
+from app.consumers.job_consumer import process_job_queue
 
 from .pkg.config import get_config
 from .pkg.db import engine
@@ -8,7 +11,7 @@ from .pkg.interceptor.exception import register_exception_handlers
 from .di import get_job_router
 from .routers.job_router import JobRouter
 from sqlalchemy import text
-from .pkg.rabbitmq import get_channel
+from .pkg.rabbitmq import QueueName, consume_queue, get_channel
 
 config = get_config()
 
@@ -27,6 +30,7 @@ async def lifespan(app: FastAPI):
     # RabbitMQ
     try:
         app.state.rabbitmq_channel = await get_channel()
+        asyncio.create_task(consume_queue(QueueName.UPLOAD_JOB, process_job_queue))
         print("RabbitMQ channel ready")
     except Exception as e:
         print("RabbitMQ connection failed:", e)
