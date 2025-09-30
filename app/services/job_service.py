@@ -55,7 +55,7 @@ class JobServiceImpl(JobService):
 
         text = extract_text_from_file(tmp_path)
 
-        data_upload = upload_document(tmp_path, f"jobs/{file.filename}")
+        data_upload = upload_document(tmp_path, f"jobs/{uuid.uuid4().hex}")
 
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
@@ -70,7 +70,7 @@ class JobServiceImpl(JobService):
         publish_data = {"queue_id": queue.id, "data": text}
 
         try:
-            publish_message(
+            await publish_message(
                 ExchangeName.JOB,
                 QueueName.UPLOAD_JOB.value,
                 json.dumps(publish_data).encode('utf-8')
@@ -83,7 +83,7 @@ class JobServiceImpl(JobService):
     
     async def get_list(self) -> list[GetListJobResponse]:
         jobs = self.jobRepository.get_list()
-        response = [GetListJobResponse(id=job.id, title=job.title) for job in jobs]
+        response = [GetListJobResponse(id=job.id, title=job.title, description=job.description, requirements=job.requirements) for job in jobs]
 
         return response
     
@@ -129,18 +129,20 @@ class JobServiceImpl(JobService):
             requirements = result.get("requirement") or result.get("requirements") or ""
 
             # 4. DB Transaction
-            with self.db.begin():
-                job = self.jobRepository.update_trx(queue_id, title, description, requirements)
-                if job is None:
-                    raise ValueError(f"Job with id {queue_id} not found")
+            job = self.jobRepository.update_trx(queue_id, title, description, requirements)
+            if job is None:
+                raise ValueError(f"Job with id {queue_id} not found")
 
-                self.queueRepository.update_status_trx(queue_id, QueueStatus.COMPLETED.value)
-                self.db.refresh(job)
+            self.queueRepository.update_status_trx(queue_id, QueueStatus.COMPLETED.value)
+            self.db.refresh(job)
+            self.db.commit()
 
             return True
 
         except Exception as e:
-            self.queueRepository.update_status_trx(queue_id, QueueStatus.FAILED.value, reason=str(e))
+            self.db.rollback()
+            if 'queue_id' in locals():
+                self.queueRepository.update_status_trx(queue_id, QueueStatus.FAILED.value, str(e))
        
             raise e
 

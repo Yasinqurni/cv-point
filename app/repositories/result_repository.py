@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.entity.models.result_model import Result
 from fastapi import Depends
-from pkg.db import get_db
+from app.pkg.db import get_db
 
 
 class ResultRepository(ABC):
@@ -21,7 +21,7 @@ class ResultRepository(ABC):
         ...
     
     @abstractmethod
-    def get_by_job_id(self, job_id: int) -> Optional[Result]:
+    def get_by_queue_id(self, queue_id: int) -> Optional[Result]:
         ...
 
 
@@ -52,8 +52,8 @@ class ResultRepositoryImpl(ResultRepository):
         self.db.flush()
         return result
 
-    def get_by_job_id(self, job_id: int) -> Result | None:
-        return self.db.query(Result).filter(Result.job_id == job_id).first()
+    def get_by_queue_id(self, queue_id: int) -> Result | None:
+        return self.db.query(Result).filter(Result.queue_id == queue_id).first()
 
 
 def get_result_repository(

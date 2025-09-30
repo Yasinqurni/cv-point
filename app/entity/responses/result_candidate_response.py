@@ -9,5 +9,7 @@ class ResultCandidate(BaseModel):
 
 class ResultCandidateResponse(BaseModel):
     id: int
+    candidate_name: str | None
+    job_name: str | None
     status: str
     result: ResultCandidate | None

@@ -3,15 +3,17 @@ from contextlib import asynccontextmanager
 import asyncio
 
 from app.consumers.job_consumer import process_job_queue
+from app.consumers.candidate_consumer import process_candidate_queue
 
 from .pkg.config import get_config
 from .pkg.db import engine
 from .pkg.interceptor.interceptor import ErrorInterceptor
 from .pkg.interceptor.exception import register_exception_handlers
-from .di import get_job_router
+from .di import get_job_router, get_candidate_router
 from .routers.job_router import JobRouter
 from sqlalchemy import text
 from .pkg.rabbitmq import QueueName, consume_queue, get_channel
+import app.entity.models 
 
 config = get_config()
 
@@ -31,6 +33,7 @@ async def lifespan(app: FastAPI):
     try:
         app.state.rabbitmq_channel = await get_channel()
         asyncio.create_task(consume_queue(QueueName.UPLOAD_JOB, process_job_queue))
+        asyncio.create_task(consume_queue(QueueName.UPLOAD_CANDIDATE, process_candidate_queue))
         print("RabbitMQ channel ready")
     except Exception as e:
         print("RabbitMQ connection failed:", e)
@@ -41,13 +44,14 @@ async def lifespan(app: FastAPI):
     job_router: JobRouter = get_job_router()
     app.include_router(job_router.get_router(), prefix="/api/v1")
 
+    candidate_router = get_candidate_router()
+    app.include_router(candidate_router.get_router(), prefix="/api/v1")
+
     yield
 
     # Shutdown (cleanup)
     engine.dispose()
     print("Database engine disposed")
-
-
 
 
 app = FastAPI(

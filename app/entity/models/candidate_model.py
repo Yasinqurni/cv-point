@@ -11,11 +11,9 @@ class Candidate(db):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     candidate_name = Column(String(255), nullable=True)
-    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=True)
+    job_id = Column(Integer, nullable=True)
     cv_file_path = Column(String(500), nullable=False)
+    cv_text = Column(Text, nullable=True)
     report_file_path = Column(String(500), nullable=False)
+    report_text = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
-
-    # relationships
-    jobs = relationship("Job", back_populates="candidates")
-

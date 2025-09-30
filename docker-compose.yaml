@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: cv-point-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  db:
+    image: mysql:8.0
+    container_name: cv-point-db
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_DATABASE: cv_point
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  migrate:
+    image: ghcr.io/amacneil/dbmate:2
+    container_name: cv-point-migrate
+    depends_on:
+      - db
+    environment:
+      - DBMATE_URL=mysql://admin:admin@db:3306/cv_point?charset=utf8mb4&parseTime=true
+    volumes:
+      - ./migrations:/migrations
+    command: ["up"]
+
+volumes:
+  db_data:

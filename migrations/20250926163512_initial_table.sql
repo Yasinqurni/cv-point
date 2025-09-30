@@ -16,7 +16,9 @@ CREATE TABLE candidates (
     candidate_name VARCHAR(255),
     job_id INT,
     cv_file_path VARCHAR(500) NOT NULL,
+    cv_text LONGTEXT,
     report_file_path VARCHAR(500) NOT NULL,
+    report_text LONGTEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      CONSTRAINT fk_candidates_job
         FOREIGN KEY (job_id) REFERENCES jobs(id)

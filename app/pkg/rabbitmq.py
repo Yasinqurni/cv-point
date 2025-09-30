@@ -4,7 +4,7 @@ from enum import Enum
 
 class ExchangeName(str, Enum):
     JOB = "job_exchange"
-    UPLOAD = "candidate_exchange"
+    CANDIDATE = "candidate_exchange"
 
 class QueueName(str, Enum):
     UPLOAD_JOB = "upload_job_queue"
@@ -38,7 +38,7 @@ async def get_channel():
         durable=True,
     )
     upload_exchange = await channel.declare_exchange(
-        ExchangeName.UPLOAD.value,
+        ExchangeName.CANDIDATE.value,
         aio_pika.ExchangeType.DIRECT,
         durable=True,
     )

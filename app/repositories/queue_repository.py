@@ -16,7 +16,7 @@ class QueueRepository(ABC):
         ...
 
     @abstractmethod
-    def update_status_trx(self, queue_id: int, status: str, reason: str) -> Optional[Queue]:
+    def update_status_trx(self, queue_id: int, status: str, reason: str = "") -> Optional[Queue]:
         ...
     
     @abstractmethod
@@ -52,7 +52,7 @@ class QueueRepositoryImpl(QueueRepository):
         self.db.refresh(queue)
         return queue
 
-    def update_status_trx(self, queue_id: int, status: str, reason: str) -> Queue | None:
+    def update_status_trx(self, queue_id: int, status: str, reason: str = "") -> Queue | None:
         queue = self.db.query(Queue).filter(Queue.id == queue_id).first()
         if queue:
             queue.status = status

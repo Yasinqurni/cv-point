@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
 from fastapi import UploadFile, Depends
 from app.services.candidate_service import CandidateService, CandidateServiceImpl, get_candidate_service
-from app.entity.requests.create_candidate_request import CreateCandidateRequest
 from app.pkg.interceptor.response import success_response, error_response
 
 class CandidateController(ABC):
     @abstractmethod
-    async def upload_candidate(self, req: CreateCandidateRequest):
+    async def upload_candidate(self, candidate_name: str, job_id: int, cv: UploadFile, project_report: UploadFile):
         ...
 
     @abstractmethod
@@ -21,9 +20,9 @@ class CandidateControllerImpl(CandidateController):
     def __init__(self, service: CandidateService):
         self.service = service
 
-    async def upload_candidate(self, req: CreateCandidateRequest):
+    async def upload_candidate(self, candidate_name: str, job_id: int, cv: UploadFile, project_report: UploadFile):
         try:
-            result = await self.service.handle_upload(req)
+            result = await self.service.handle_upload(candidate_name, job_id, cv, project_report)
             return success_response(result)
         except ValueError as ve:
             return error_response(message=str(ve), status_code=400)

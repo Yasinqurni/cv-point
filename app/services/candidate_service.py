@@ -11,7 +11,6 @@ import requests
 import re
 
 from app.entity.models.queue_model import QueueSource, QueueStatus
-from app.entity.requests.create_candidate_request import CreateCandidateRequest
 from app.entity.responses.evaluate_candidate_response import EvaluateCandidateResponse
 from app.pkg.db import get_db
 from app.pkg.cloudinary import upload_document
@@ -30,7 +29,7 @@ from ..repositories.job_repository import JobRepository, get_job_repository, Job
 
 class CandidateService(ABC):
     @abstractmethod
-    async def handle_upload(self, req: CreateCandidateRequest) -> CreateCandidateResponse:
+    async def handle_upload(self, candidate_name: str, job_id: int, cv: UploadFile, project_report: UploadFile) -> CreateCandidateResponse:
         ...
 
     @abstractmethod
@@ -61,19 +60,26 @@ class CandidateServiceImpl(CandidateService):
         self.jobRepository = jobRepository
         self.db = db
 
-    async def handle_upload(self, req: CreateCandidateRequest) -> CreateCandidateResponse:
-        cv_suffix = os.path.splitext(req.cv.filename)[-1]
+    async def handle_upload(self, candidate_name: str, job_id: int, cv: UploadFile, project_report: UploadFile) -> CreateCandidateResponse:
+        job = self.jobRepository.get_by_id(job_id)
+        if not job:
+            raise ValueError("Job not found")
+        
+        cv_suffix = os.path.splitext(cv.filename)[-1]
         cv_tmp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}{cv_suffix}")
         with open(cv_tmp_path, "wb") as buffer:
-            buffer.write(await req.cv.read())
+            buffer.write(await cv.read())
 
-        report_suffix = os.path.splitext(req.project_report.filename)[-1]
+        report_suffix = os.path.splitext(project_report.filename)[-1]
         report_tmp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}{report_suffix}")
         with open(report_tmp_path, "wb") as buffer:
-            buffer.write(await req.project_report.read())
+            buffer.write(await project_report.read())
 
-        cv_upload = upload_document(cv_tmp_path, f"candidates/{req.cv.filename}")
-        report_upload = upload_document(report_tmp_path, f"candidates/{req.project_report.filename}")
+        cv_upload = upload_document(cv_tmp_path, f"candidates/{uuid.uuid4().hex}")
+        report_upload = upload_document(report_tmp_path, f"candidates/{uuid.uuid4().hex}")
+
+        cv_text = extract_text_from_file(cv_tmp_path)
+        report_text = extract_text_from_file(report_tmp_path)
 
         if os.path.exists(cv_tmp_path):
             os.remove(cv_tmp_path)
@@ -84,7 +90,14 @@ class CandidateServiceImpl(CandidateService):
         cv_file_url = cv_upload['secure_url']
         report_file_url = report_upload['secure_url']
         
-        candidate = self.candidateRepository.create(req.candidate_name, cv_file_url, report_file_url, req.job_id)
+        candidate = self.candidateRepository.create(
+            candidate_name,
+            cv_file_url,
+            report_file_url,
+            job_id,
+            cv_text,
+            report_text
+        )
 
         return CreateCandidateResponse(id=candidate.id)
 
@@ -97,45 +110,18 @@ class CandidateServiceImpl(CandidateService):
         if queue:
             return EvaluateCandidateResponse(id=candidate.id, status=queue.status)
 
-        cv_url = candidate.cv_file_url
-        report_url = candidate.report_file_url
-
-        cv_suffix = os.path.splitext(cv_url)[-1] or ".pdf"
-        report_suffix = os.path.splitext(report_url)[-1] or ".pdf"
-        cv_tmp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}{cv_suffix}")
-        report_tmp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}{report_suffix}")
-
-        with requests.get(cv_url, stream=True) as r:
-            r.raise_for_status()
-            with open(cv_tmp_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-        with requests.get(report_url, stream=True) as r:
-            r.raise_for_status()
-            with open(report_tmp_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-        cv_text = extract_text_from_file(cv_tmp_path)
-        report_text = extract_text_from_file(report_tmp_path)
-
-        if os.path.exists(cv_tmp_path):
-            os.remove(cv_tmp_path)
-        if os.path.exists(report_tmp_path):
-            os.remove(report_tmp_path)
 
         queue = self.queueRepository.create(candidate.id, QueueSource.CANDIDATE.value)
         publish_data = {
             "candidate_id": candidate.id,
             "job_id": candidate.job_id,
             "queue_id": queue.id,
-            "cv_text": cv_text,
-            "report_text": report_text
+            "cv_text": candidate.cv_text,
+            "report_text": candidate.report_text
         }
 
         try:
-            publish_message(
+            await publish_message(
                 ExchangeName.CANDIDATE,
                 QueueName.UPLOAD_CANDIDATE.value,
                 json.dumps(publish_data).encode('utf-8')
@@ -157,7 +143,7 @@ class CandidateServiceImpl(CandidateService):
             report_text = data.get("report_text")
             candidate_id = data.get("candidate_id")
             job_id = data.get("job_id")
-
+ 
             if not queue_id or not candidate_id or not job_id:
                 raise ValueError("Invalid message format")
 
@@ -202,34 +188,44 @@ class CandidateServiceImpl(CandidateService):
             project_feedback = result.get("project_feedback", "")
             overall_summary = result.get("overall_summary", "")
 
-            with self.db.begin():
-                self.queueRepository.update_status_trx(queue_id, QueueStatus.COMPLETED.value)
-                self.resultRepository.create(
-                    queue_id=queue_id,
-                    cv_match_rate=cv_match_rate,
-                    cv_feedback=cv_feedback,
-                    project_score=project_score,
-                    project_feedback=project_feedback,
-                    overall_summary=overall_summary,
-                    raw_output=result
-                )
+        
+            self.queueRepository.update_status_trx(queue_id, QueueStatus.COMPLETED.value)
+            self.resultRepository.create_trx(
+                queue_id=queue_id,
+                cv_match_rate=cv_match_rate,
+                cv_feedback=cv_feedback,
+                project_score=project_score,
+                project_feedback=project_feedback,
+                overall_summary=overall_summary,
+                raw_output=result
+            )
+
+            self.db.commit()
             return True
 
         except Exception as e:
-            self.queueRepository.update_status_trx(queue_id, QueueStatus.FAILED.value, reason=str(e))
+            self.db.rollback()
+            print(f"Error processing candidate: {e}")
+            if 'queue_id' in locals():
+                self.queueRepository.update_status_trx(queue_id, QueueStatus.FAILED.value, str(e))
             raise e
 
     async def result(self, id: int) -> ResultCandidateResponse:
-        queue = self.queueRepository.get_by_id(id)
+        candidate = self.candidateRepository.get_by_id(id)
+        if not candidate:
+            raise ValueError("Candidate not found")
+        
+        queue = self.queueRepository.get_by_source_and_upload_id(QueueSource.CANDIDATE.value, candidate.id)
         if not queue:
             raise ValueError("Queue not found")
-        
-        if queue.source != QueueSource.JOB.value:
-            raise ValueError("Queue source is not candidate")
 
-        result = self.resultRepository.get_by_queue_id(id)
+        result = self.resultRepository.get_by_queue_id(queue.id)
         if not result:
             raise ValueError("Result not found for this queue")
+        
+        job = self.jobRepository.get_by_id(candidate.job_id)
+        if not job:
+            raise ValueError("Job not found")
         
         resultData = ResultCandidate(
             cv_match_rate=result.cv_match_rate,
@@ -240,7 +236,9 @@ class CandidateServiceImpl(CandidateService):
             raw_output=result.raw_output
         )
         return ResultCandidateResponse(
-            queue_id=queue.id,
+            id=candidate.id,
+            candidate_name=candidate.candidate_name,
+            job_name=job.title,
             status=queue.status,
             result=resultData
         )
